@@ -5,6 +5,7 @@ import { IUser } from '../types/user';
 import jwt from 'jsonwebtoken';
 import Article from '../model/articleModel';
 import dotenv from 'dotenv';
+import { create } from 'domain';
 
 dotenv.config();
 
@@ -22,6 +23,12 @@ const registerUser = async (req: Request, res: Response): Promise<void> => {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             res.status(409).json({ message: 'User already exists' });
+            return; 
+        }
+
+        const existingUserByPhone = await User.findOne({ phone });
+        if (existingUserByPhone) {
+            res.status(409).json({ message: 'User with this phone number already exists' });
             return; 
         }
 
@@ -214,79 +221,6 @@ const createArticles = async (req: Request, res: Response): Promise<void> => {
     }
 }
 
-//  const getArticlesByPreferences = async (req: Request, res: Response) => {
-//   try {
-//     const { preferences } = req.body;
-    
-//     console.log("Received preferences:", preferences);
-    
-//     if (!preferences || !Array.isArray(preferences) || preferences.length === 0) {
-//       return res.status(400).json({ message: "Valid preferences are required" });
-//     }
-
-//     // Find articles matching user preferences (category or tags)
-//     const articles = await Article.find({
-//       $or: [
-//         { category: { $in: preferences } },
-//         { tags: { $in: preferences } }
-//       ]
-//     }).sort({ createdAt: -1 }); // Sort by newest first
-    
-//     console.log("Found articles:", JSON.stringify(articles, null, 2));
-//     console.log(`Total articles found: ${articles.length}`);
-
-//     // Get unique user IDs from articles
-//     const userIds = [...new Set(articles.map(article => article.userId))];
-//     console.log("Unique user IDs:", userIds);
-    
-//     // Find all users who authored these articles
-//     const authors = await User.find({
-//       _id: { $in: userIds }
-//     }, { _id: 1, firstName: 1, lastName: 1 });
-    
-//     console.log("Found authors:", JSON.stringify(authors, null, 2));
-
-//     // Create a map of user IDs to author names
-//     const authorMap = authors.reduce((map, user: any) => {
-//       map[user._id.toString()] = `${user.firstName} ${user.lastName}`;
-//       return map;
-//     }, {} as Record<string, string>);
-    
-//     console.log("Author map:", authorMap);
-
-//     // Combine article data with author information
-//     const articlesWithAuthors = articles.map(article => {
-//       const articleObj = article.toObject();
-//       const authorName = authorMap[articleObj.userId] || 'Unknown Author';
-      
-//       const result = {
-//         id: articleObj._id,
-//         title: articleObj.title,
-//         excerpt: articleObj.description.substring(0, 150) + (articleObj.description.length > 150 ? '...' : ''),
-//         description: articleObj.description,
-//         category: articleObj.category,
-//         tags: articleObj.tags,
-//         image: articleObj.imageUrl,
-//         author: authorName,
-//         authorId: articleObj.userId,
-//         date: new Date(articleObj.createdAt).toLocaleDateString(),
-//         createdAt: articleObj.createdAt
-//       };
-      
-//       return result;
-//     });
-    
-//     console.log("Final articles with authors:", JSON.stringify(articlesWithAuthors, null, 2));
-//     console.log(`Total combined articles: ${articlesWithAuthors.length}`);
-
-//     return res.status(200).json(articlesWithAuthors);
-//   } catch (error) {
-//     console.error("Error fetching articles with authors:", error);
-//     return res.status(500).json({ message: "Server error while fetching articles" });
-//   }
-// };
-
-
 const getArticlesByPreferences = async (req, res) => {
   try {
     const { preferences, userId } = req.body
@@ -448,14 +382,13 @@ const dislikeArticle = async (req: Request, res: Response) => {
     const previouslyLiked = article.like.includes(userId);
     
     if (previouslyLiked) {
-      // Remove from like array
+
       article.like = article.like.filter(id => id !== userId);
     }
     
-    // Add to dislike array
+
     article.dislike.push(userId);
-    
-    // Save the updated article
+
     await article.save();
     
     return res.status(200).json({ 
@@ -468,18 +401,82 @@ const dislikeArticle = async (req: Request, res: Response) => {
   }
 };
 
-//  const blockArticle = async (req: Request, res: Response) => {
-//   try {
-//     const { articleId } = req.params;
-//     const userId = req.user?.id; // Assuming you have authentication middleware
+const blockArticle = async (req: Request, res: Response) => {
+  try {
+    const { articleId } = req.params;
+    const { userId } = req.body;
+    console.log(userId, 'the userid is coming')
 
-//     // Here you would typically add to user's blocked articles collection
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized, user not authenticated" });
+    }
+
+
+    const article = await Article.findById(articleId);
     
-//     return res.status(200).json({ message: "Article blocked successfully" });
-//   } catch (error) {
-//     console.error("Error blocking article:", error);
-//     return res.status(500).json({ message: "Server error" });
-//   }
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+    
 
+    if (!article.block.includes(userId)) {
+      article.block.push(userId);
+      await article.save();
+    }
+    
+    return res.status(200).json({ message: "Article blocked successfully" });
+  } catch (error) {
+    console.error("Error blocking article:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+}
 
-export default { registerUser, loginUser, createArticles, refreshToken,logoutUser, getArticlesByPreferences,likeArticle,dislikeArticle };
+const getUserArticles = async (req: Request, res: Response) => {
+  try {
+
+    const { userId } = req.params;
+    
+
+    if (!userId) {
+      return res.status(400).json({ message: "User ID is required" });
+    }
+
+    const rawArticles = await Article.find({ userId })
+      .sort({ createdAt: -1 });
+    
+
+    const articles = rawArticles.map((article: any) => {
+
+      const likesCount = article.like?.length || 0;
+      const dislikesCount = article.dislike?.length || 0;
+      const blocksCount = article.block?.length || 0;
+
+      const totalReaders = likesCount + dislikesCount + blocksCount;
+
+      return {
+        id: article._id.toString(),
+        title: article.title,
+        imageUrl: article.imageUrl,
+        category: article.category,
+        tags: article.tags,
+        createdAt: article.createdAt,
+        likes: likesCount,
+        dislikes: dislikesCount,
+        blocks: blocksCount,
+        totalReaders: totalReaders
+      };
+    });
+    
+
+    return res.status(200).json({ 
+      articles,
+      count: articles.length,
+      message: "Successfully retrieved all user articles"
+    });
+  } catch (error) {
+    console.error("Error fetching user articles:", error);
+    return res.status(500).json({ message: "Failed to fetch articles" });
+  }
+};
+
+export default { registerUser, loginUser, createArticles, refreshToken,logoutUser, getArticlesByPreferences,likeArticle,dislikeArticle,blockArticle,getUserArticles };
