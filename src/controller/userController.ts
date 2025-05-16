@@ -6,6 +6,7 @@ import jwt from 'jsonwebtoken';
 import Article from '../model/articleModel';
 import dotenv from 'dotenv';
 import { create } from 'domain';
+import { ArticleDetails } from '../types/article';
 
 dotenv.config();
 
@@ -147,6 +148,7 @@ const logoutUser = async (req: Request, res: Response): Promise<void> => {
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict'
         });
+       res.status(200).json({ message: 'logout successfully' });
     } catch (error) {
         console.error('Error logging out user:', error);}
         res.status(500).json({ message: 'Internal server error' });
@@ -459,6 +461,7 @@ const getUserArticles = async (req: Request, res: Response) => {
         imageUrl: article.imageUrl,
         category: article.category,
         tags: article.tags,
+        description:article.description,
         createdAt: article.createdAt,
         likes: likesCount,
         dislikes: dislikesCount,
@@ -479,4 +482,163 @@ const getUserArticles = async (req: Request, res: Response) => {
   }
 };
 
-export default { registerUser, loginUser, createArticles, refreshToken,logoutUser, getArticlesByPreferences,likeArticle,dislikeArticle,blockArticle,getUserArticles };
+const deleteArticle = async (req: Request, res: Response) => {
+  try {
+    const { articleId } = req.params;
+
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+  
+    await Article.findByIdAndDelete(articleId);
+
+    return res.status(200).json({ message: "Article deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting article:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const editArticle = async (req: Request, res: Response) => {
+  try {
+    const { articleId } = req.params;
+    console.log(req.body, 'is the details are coming or not');
+    
+    // Extract the article data, handling both direct data and nested editingArticle structure
+    let articleData;
+    if (req.body.editingArticle) {
+      // If data is wrapped in editingArticle object
+      articleData = req.body.editingArticle;
+    } else {
+      // If data is directly in the request body
+      articleData = req.body;
+    }
+
+    const { id, title, imageUrl, category, tags, description } = articleData;
+
+    // Check if the article exists
+    const article = await Article.findById(articleId);
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
+
+    console.log(article, 'the article is getting from the database');
+    
+    // Build the update object with only fields that are provided
+    const updatedData: Partial<ArticleDetails> = {};
+    if (id) updatedData.id = id;
+    if (title) updatedData.title = title;
+    if (imageUrl) updatedData.imageUrl = imageUrl;
+    if (category) updatedData.category = category;
+    if (tags) updatedData.tags = tags;
+    if (description) updatedData.description = description;
+
+    console.log(updatedData, 'data prepared for update');
+    
+    // Update the article
+    const updatedArticle = await Article.findByIdAndUpdate(
+      articleId,
+      updatedData,
+      { new: true, runValidators: true }
+    );
+
+    console.log(updatedArticle, 'the updated article is coming');
+
+    return res.status(200).json({
+      message: "Article updated successfully",
+      article: updatedArticle,
+    });
+
+  } catch (error) {
+    console.error("Error updating article:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const getProfile = async(req:Request,res:Response)=>{
+  try {
+      const{userId} = req.params
+      console.log(userId)
+      let response = await User.findById(userId)
+      res.status(200).json(response)
+    
+  } catch (error) {
+    console.error("Error updating article:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+const updateProfile = async (req: Request, res: Response) => {
+  try {
+    console.log(req.body.details, 'the result is coming');
+    
+    const { _id, firstName, lastName, email, phone, dob, articlePreferences } = req.body.details;
+    console.log('Incoming _id:',req.body.details._id, 'Type:', typeof req.body.details._id);
+    // Find and update the user in the database
+    const updatedUser = await User.findByIdAndUpdate(
+      _id,
+      {
+        firstName:firstName,
+        lastName:lastName,
+        email:email,
+        phone:phone,
+        dob:dob,
+        articlePreferences:articlePreferences
+      },
+        { new: true }
+    );
+    console.log(updatedUser,'the updated user is comming ')
+    
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    
+    // Return the updated user
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: updatedUser
+    });
+    
+  } catch (error) {
+    console.error("Error updating profile:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const changePassword = async (req: Request, res: Response) => {
+  try {
+    const { currentPassword, newPassword,userid } = req.body;
+
+
+
+    const user = await User.findById(userid);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+ 
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+
+    const saltRounds = 10;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    user.password = hashedNewPassword;
+    await user.save();
+
+    return res.status(200).json({ message: 'Password changed successfully' });
+
+  } catch (error) {
+    console.error('Error changing password:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+
+export default { registerUser, loginUser, createArticles, refreshToken,logoutUser, getArticlesByPreferences,likeArticle,dislikeArticle,blockArticle,getUserArticles,deleteArticle,editArticle,getProfile,updateProfile,changePassword };

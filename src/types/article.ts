@@ -12,3 +12,14 @@ export interface IArticle extends Document {
   dislike:string[];
   block:string[];
 }
+
+
+export interface ArticleDetails {
+  id?: string;
+  title?: string;
+  imageUrl?: string;
+  category?: string;
+  tags?: string[];
+  description?: string;
+  createdAt?: string;
+}

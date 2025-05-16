@@ -124,6 +124,7 @@ const logoutUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () 
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict'
         });
+        res.status(200).json({ message: 'logout successfully' });
     }
     catch (error) {
         console.error('Error logging out user:', error);
@@ -365,6 +366,7 @@ const getUserArticles = (req, res) => __awaiter(void 0, void 0, void 0, function
                 imageUrl: article.imageUrl,
                 category: article.category,
                 tags: article.tags,
+                description: article.description,
                 createdAt: article.createdAt,
                 likes: likesCount,
                 dislikes: dislikesCount,
@@ -383,4 +385,131 @@ const getUserArticles = (req, res) => __awaiter(void 0, void 0, void 0, function
         return res.status(500).json({ message: "Failed to fetch articles" });
     }
 });
-exports.default = { registerUser, loginUser, createArticles, refreshToken, logoutUser, getArticlesByPreferences, likeArticle, dislikeArticle, blockArticle, getUserArticles };
+const deleteArticle = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { articleId } = req.params;
+        const article = yield articleModel_1.default.findById(articleId);
+        if (!article) {
+            return res.status(404).json({ message: "Article not found" });
+        }
+        yield articleModel_1.default.findByIdAndDelete(articleId);
+        return res.status(200).json({ message: "Article deleted successfully" });
+    }
+    catch (error) {
+        console.error("Error deleting article:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+const editArticle = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { articleId } = req.params;
+        console.log(req.body, 'is the details are coming or not');
+        // Extract the article data, handling both direct data and nested editingArticle structure
+        let articleData;
+        if (req.body.editingArticle) {
+            // If data is wrapped in editingArticle object
+            articleData = req.body.editingArticle;
+        }
+        else {
+            // If data is directly in the request body
+            articleData = req.body;
+        }
+        const { id, title, imageUrl, category, tags, description } = articleData;
+        // Check if the article exists
+        const article = yield articleModel_1.default.findById(articleId);
+        if (!article) {
+            return res.status(404).json({ message: "Article not found" });
+        }
+        console.log(article, 'the article is getting from the database');
+        // Build the update object with only fields that are provided
+        const updatedData = {};
+        if (id)
+            updatedData.id = id;
+        if (title)
+            updatedData.title = title;
+        if (imageUrl)
+            updatedData.imageUrl = imageUrl;
+        if (category)
+            updatedData.category = category;
+        if (tags)
+            updatedData.tags = tags;
+        if (description)
+            updatedData.description = description;
+        console.log(updatedData, 'data prepared for update');
+        // Update the article
+        const updatedArticle = yield articleModel_1.default.findByIdAndUpdate(articleId, updatedData, { new: true, runValidators: true });
+        console.log(updatedArticle, 'the updated article is coming');
+        return res.status(200).json({
+            message: "Article updated successfully",
+            article: updatedArticle,
+        });
+    }
+    catch (error) {
+        console.error("Error updating article:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+const getProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { userId } = req.params;
+        console.log(userId);
+        let response = yield userModel_1.default.findById(userId);
+        res.status(200).json(response);
+    }
+    catch (error) {
+        console.error("Error updating article:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+const updateProfile = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        console.log(req.body.details, 'the result is coming');
+        const { _id, firstName, lastName, email, phone, dob, articlePreferences } = req.body.details;
+        console.log('Incoming _id:', req.body.details._id, 'Type:', typeof req.body.details._id);
+        // Find and update the user in the database
+        const updatedUser = yield userModel_1.default.findByIdAndUpdate(_id, {
+            firstName: firstName,
+            lastName: lastName,
+            email: email,
+            phone: phone,
+            dob: dob,
+            articlePreferences: articlePreferences
+        }, { new: true });
+        console.log(updatedUser, 'the updated user is comming ');
+        if (!updatedUser) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        // Return the updated user
+        return res.status(200).json({
+            message: "Profile updated successfully",
+            user: updatedUser
+        });
+    }
+    catch (error) {
+        console.error("Error updating profile:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+});
+const changePassword = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const { currentPassword, newPassword, userid } = req.body;
+        const user = yield userModel_1.default.findById(userid);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        const isMatch = yield bcrypt_1.default.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+        const saltRounds = 10;
+        const hashedNewPassword = yield bcrypt_1.default.hash(newPassword, saltRounds);
+        user.password = hashedNewPassword;
+        yield user.save();
+        return res.status(200).json({ message: 'Password changed successfully' });
+    }
+    catch (error) {
+        console.error('Error changing password:', error);
+        return res.status(500).json({ message: 'Internal server error' });
+    }
+});
+exports.default = { registerUser, loginUser, createArticles, refreshToken, logoutUser, getArticlesByPreferences, likeArticle, dislikeArticle, blockArticle, getUserArticles, deleteArticle, editArticle, getProfile, updateProfile, changePassword };
