@@ -22,10 +22,23 @@ const articleSchema = new Schema<IArticle>({
     type: String,
     required: true,
   },
+  userId: {
+    type: String,
+    required: true,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
   },
+  like:{
+    type:[String],
+  },
+  dislike:{
+    type:[String],
+  },
+  block:{
+    type:[String],
+  }
 })
 
 const Article = mongoose.model<IArticle>("Article", articleSchema)

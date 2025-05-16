@@ -6,5 +6,9 @@ export interface IArticle extends Document {
   category: string;
   tags: string[];
   imageUrl:string;
+  userId:string;
   createdAt: Date;
+  like:string[];
+  dislike:string[];
+  block:string[];
 }

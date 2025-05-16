@@ -55,10 +55,23 @@ const articleSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    userId: {
+        type: String,
+        required: true,
+    },
     createdAt: {
         type: Date,
         default: Date.now,
     },
+    like: {
+        type: [String],
+    },
+    dislike: {
+        type: [String],
+    },
+    block: {
+        type: [String],
+    }
 });
 const Article = mongoose_1.default.model("Article", articleSchema);
 exports.default = Article;
