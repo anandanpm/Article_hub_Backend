@@ -114,17 +114,17 @@ const loginUser = async (req: Request, res: Response): Promise<void> => {
      
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production', 
+            secure: true,
             maxAge: 7 * 24 * 60 * 60 * 1000,
-            sameSite: 'strict'
+            sameSite: 'none'
         });
         
         
         res.cookie('accessToken', accessToken, {
             httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
+            secure: true,
             maxAge: 15 * 60 * 1000,
-            sameSite: 'strict'
+            sameSite: 'none'
         });
         
         res.status(200).json({ 
