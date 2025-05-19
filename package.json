@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon --watch src --ext ts,tsx --ignore dist --exec \"npm run dev:exec\"",
     "dev:exec": " npm install && npm run clean && npm run build && node dist/index.js",
-    "build": "tsc",
+    "build": "npm install && tsc",
     "clean": "rimraf dist",
     "start": "node dist/index.js"
   },
