@@ -141,14 +141,15 @@ const logoutUser = async (req: Request, res: Response): Promise<void> => {
     try {   
         res.clearCookie('refreshToken', {
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            sameSite: 'none'
         });
         
         res.clearCookie('accessToken', {
             secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
+            sameSite: 'none'
         });
        res.status(200).json({ message: 'logout successfully' });
+       return;
     } catch (error) {
         console.error('Error logging out user:', error);}
         res.status(500).json({ message: 'Internal server error' });
