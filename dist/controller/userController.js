@@ -59,6 +59,7 @@ const registerUser = (req, res) => __awaiter(void 0, void 0, void 0, function* (
 const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { identifier, password } = req.body;
+        console.log(req.body, 'the result is comming');
         if (!identifier || !password) {
             res.status(400).json({ message: 'Email/Phone and password are required' });
             return;
@@ -70,12 +71,12 @@ const loginUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
             ]
         });
         if (!user) {
-            res.status(401).json({ message: 'Invalid credentials' });
+            res.status(400).json({ message: 'Invalid credentials' });
             return;
         }
         const isMatch = yield bcrypt_1.default.compare(password, user.password);
         if (!isMatch) {
-            res.status(401).json({ message: 'Invalid credentials' });
+            res.status(400).json({ message: 'Invalid credentials' });
             return;
         }
         if (!process.env.JWT_ACCESS_SECRET || !process.env.JWT_REFRESH_SECRET) {
@@ -189,18 +190,22 @@ const createArticles = (req, res) => __awaiter(void 0, void 0, void 0, function*
 });
 const getArticlesByPreferences = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { preferences, userId } = req.body;
-        console.log("Received preferences:", preferences);
+        const { userId } = req.body;
         console.log("User ID:", userId);
-        if (!preferences || !Array.isArray(preferences) || preferences.length === 0) {
-            return res.status(400).json({ message: "Valid preferences are required" });
-        }
         if (!userId) {
             console.log("Warning: userId not provided, user interaction status will be false");
         }
+        let user = yield userModel_1.default.findById(userId);
+        console.log(user, 'user is comming');
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        let preferences = user.articlePreferences;
+        console.log(preferences, 'this is the preferences');
         const articles = yield articleModel_1.default.find({ category: { $in: preferences } })
             .sort({ createdAt: -1 })
             .limit(20);
+        console.log(articles, 'is this is comming or not');
         if (!articles || articles.length === 0) {
             return res.status(404).json({ message: "No articles found for the given preferences" });
         }
@@ -360,6 +365,9 @@ const getUserArticles = (req, res) => __awaiter(void 0, void 0, void 0, function
             const dislikesCount = ((_b = article.dislike) === null || _b === void 0 ? void 0 : _b.length) || 0;
             const blocksCount = ((_c = article.block) === null || _c === void 0 ? void 0 : _c.length) || 0;
             const totalReaders = likesCount + dislikesCount + blocksCount;
+            if (!article.description) {
+                console.warn(`Missing description for article ID: ${article._id}`);
+            }
             return {
                 id: article._id.toString(),
                 title: article.title,

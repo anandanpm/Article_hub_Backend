@@ -5,7 +5,6 @@ import { IUser } from '../types/user';
 import jwt from 'jsonwebtoken';
 import Article from '../model/articleModel';
 import dotenv from 'dotenv';
-import { create } from 'domain';
 import { ArticleDetails } from '../types/article';
 
 dotenv.config();
@@ -57,6 +56,7 @@ const registerUser = async (req: Request, res: Response): Promise<void> => {
 const loginUser = async (req: Request, res: Response): Promise<void> => {
     try {
         const { identifier, password } = req.body;
+        console.log(req.body,'the result is comming')
         
         if (!identifier || !password) {
             res.status(400).json({ message: 'Email/Phone and password are required' });
@@ -72,14 +72,14 @@ const loginUser = async (req: Request, res: Response): Promise<void> => {
         });
         
         if (!user) {
-            res.status(401).json({ message: 'Invalid credentials' });
+            res.status(400).json({ message: 'Invalid credentials' });
             return;
         }
         
     
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
-            res.status(401).json({ message: 'Invalid credentials' });
+            res.status(400).json({ message: 'Invalid credentials' });
             return;
         }
 
@@ -225,23 +225,28 @@ const createArticles = async (req: Request, res: Response): Promise<void> => {
 
 const getArticlesByPreferences = async (req, res) => {
   try {
-    const { preferences, userId } = req.body
+    const { userId } = req.body
 
-    console.log("Received preferences:", preferences)
+
     console.log("User ID:", userId)
-
-    if (!preferences || !Array.isArray(preferences) || preferences.length === 0) {
-      return res.status(400).json({ message: "Valid preferences are required" })
-    }
 
     if (!userId) {
       console.log("Warning: userId not provided, user interaction status will be false")
     }
 
+    let user = await User.findById(userId)
+    console.log(user,'user is comming')
+    if (!user) {
+      return res.status(404).json({ message: "User not found" })
+    }
+    let preferences = user.articlePreferences
+   console.log(preferences,'this is the preferences')
     const articles = await Article.find({ category: { $in: preferences } })
       .sort({ createdAt: -1 })
       .limit(20)
+    
 
+      console.log(articles,'is this is comming or not')
     if (!articles || articles.length === 0) {
       return res.status(404).json({ message: "No articles found for the given preferences" })
     }
@@ -454,6 +459,9 @@ const getUserArticles = async (req: Request, res: Response) => {
       const blocksCount = article.block?.length || 0;
 
       const totalReaders = likesCount + dislikesCount + blocksCount;
+       if (!article.description) {
+        console.warn(`Missing description for article ID: ${article._id}`);
+      }
 
       return {
         id: article._id.toString(),
